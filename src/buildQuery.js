@@ -8,11 +8,14 @@ export const buildQueryFactory = (
     getResponseParserImpl
 ) => introspectionResults => {
     const knownResources = introspectionResults.resources.map(r => r.type.name);
+    console.log('knownResources', knownResources);
 
     return (aorFetchType, resourceName, params) => {
         const resource = introspectionResults.resources.find(
             r => r.type.name === resourceName
         );
+
+        console.log('introspectionResults', introspectionResults);
 
         if (!resource) {
             throw new Error(
@@ -49,6 +52,12 @@ export const buildQueryFactory = (
             resource,
             queryType
         );
+
+        console.log('buildQuery', {
+            query,
+            variables,
+            parseResponse,
+        });
 
         return {
             query,
