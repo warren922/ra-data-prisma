@@ -97,18 +97,38 @@ export const buildArgs = (query, variables, inputType) => {
   );
   let args;
   if (inputType) {
-    args = inputType.inputFields
-      .filter(a => validVariables.includes(a.name))
-      .reduce(
-        (acc, arg) => [
-          ...acc,
-          gqlTypes.argument(
-            gqlTypes.name(arg.name),
-            gqlTypes.variable(gqlTypes.name(arg.name))
-          ),
-        ],
-        []
-      );
+    if (inputType.name.endsWith('CreateInput')) {
+      args = [
+        gqlTypes.argument(
+          gqlTypes.name('data'),
+          gqlTypes.variable(gqlTypes.name('data'))
+        )
+      ];
+    } else if (inputType.name.endsWith('UpdateInput')) {
+      args = [
+        gqlTypes.argument(
+          gqlTypes.name('data'),
+          gqlTypes.variable(gqlTypes.name('data'))
+        ),
+        gqlTypes.argument(
+          gqlTypes.name('where'),
+          gqlTypes.variable(gqlTypes.name('where'))
+        )
+      ];
+    } else {
+      args = inputType.inputFields
+        .filter(a => validVariables.includes(a.name))
+        .reduce(
+          (acc, arg) => [
+            ...acc,
+            gqlTypes.argument(
+              gqlTypes.name(arg.name),
+              gqlTypes.variable(gqlTypes.name(arg.name))
+            ),
+          ],
+          []
+        );
+    }
   } else {
     args = query.args
       .filter(a => validVariables.includes(a.name))
@@ -127,7 +147,7 @@ export const buildArgs = (query, variables, inputType) => {
   return args;
 };
 
-export const buildApolloArgs = (query, variables, inputType) => {
+export const buildApolloArgs = (query, variables, inputType, resource) => {
   if (query.args.length === 0) {
     return [];
   }
@@ -140,17 +160,36 @@ export const buildApolloArgs = (query, variables, inputType) => {
 
   let args;
   if (inputType) {
-    args = inputType.inputFields
-      .filter(a => validVariables.includes(a.name))
-      .reduce((acc, arg) => {
-        return [
-          ...acc,
-          gqlTypes.variableDefinition(
-            gqlTypes.variable(gqlTypes.name(arg.name)),
-            getArgType(arg)
-          ),
-        ];
-      }, []);
+    console.log('inputType', inputType);
+    if (inputType.name.endsWith('CreateInput')) {
+      args = [gqlTypes.variableDefinition(
+        gqlTypes.variable(gqlTypes.name('data')),
+        gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(inputType.name)))
+      )];
+    } else if (inputType.name.endsWith('UpdateInput')) {
+      args = [
+        gqlTypes.variableDefinition(
+          gqlTypes.variable(gqlTypes.name('data')),
+          gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(inputType.name)))
+        ),
+        gqlTypes.variableDefinition(
+          gqlTypes.variable(gqlTypes.name('where')),
+          gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(`${resource.type.name}WhereUniqueInput`)))
+        ),
+      ];
+    } else {
+      args = inputType.inputFields
+        .filter(a => validVariables.includes(a.name))
+        .reduce((acc, arg) => {
+          return [
+            ...acc,
+            gqlTypes.variableDefinition(
+              gqlTypes.variable(gqlTypes.name(arg.name)),
+              getArgType(arg)
+            ),
+          ];
+        }, []);
+    }
   } else {
     args = query.args
       .filter(a => validVariables.includes(a.name))
@@ -195,7 +234,7 @@ export default introspectionResults => (
     aorFetchType
   );
   const { sortField, sortOrder, ...metaVariables } = variables;
-  const apolloArgs = buildApolloArgs(queryType, variables, inputType);
+  const apolloArgs = buildApolloArgs(queryType, variables, inputType, resource);
   const args = buildArgs(queryType, variables, inputType);
   const metaArgs = buildArgs(queryType, metaVariables);
   const fields = buildFields(introspectionResults)(resource.type.fields);
@@ -278,7 +317,7 @@ export default introspectionResults => (
     ]);
   }
 
-  if (aorFetchType === UPDATE) {
+  if (aorFetchType === UPDATE || aorFetchType === CREATE) {
     return gqlTypes.document([
       gqlTypes.operationDefinition(
         'mutation',
@@ -286,58 +325,13 @@ export default introspectionResults => (
           gqlTypes.field(
             gqlTypes.name(queryType.name),
             gqlTypes.name('data'),
-            [
-              gqlTypes.argument(
-                gqlTypes.name('data'),
-                gqlTypes.variable(gqlTypes.name('data'))
-              ),
-              gqlTypes.argument(
-                gqlTypes.name('where'),
-                gqlTypes.variable(gqlTypes.name('where'))
-              )
-            ],
+            args,
             null,
             gqlTypes.selectionSet(fields)
           ),
         ]),
         gqlTypes.name(queryType.name),
-        [
-          gqlTypes.variableDefinition(
-            gqlTypes.variable(gqlTypes.name('data')),
-            gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(`${resource.type.name}UpdateInput`)))
-          ),
-          gqlTypes.variableDefinition(
-            gqlTypes.variable(gqlTypes.name('where')),
-            gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(`${resource.type.name}WhereUniqueInput`)))
-          ),
-        ]
-      ),
-    ]);
-  }
-
-  if (aorFetchType === CREATE) {
-    return gqlTypes.document([
-      gqlTypes.operationDefinition(
-        'mutation',
-        gqlTypes.selectionSet([
-          gqlTypes.field(
-            gqlTypes.name(queryType.name),
-            gqlTypes.name('data'),
-            [
-              gqlTypes.argument(
-                gqlTypes.name('data'),
-                gqlTypes.variable(gqlTypes.name('data'))
-              )
-            ],
-            null,
-            gqlTypes.selectionSet(fields)
-          ),
-        ]),
-        gqlTypes.name(queryType.name),
-        [gqlTypes.variableDefinition(
-          gqlTypes.variable(gqlTypes.name('data')),
-          gqlTypes.nonNullType(gqlTypes.namedType(gqlTypes.name(`${resource.type.name}CreateInput`)))
-        )]
+        apolloArgs
       ),
     ]);
   }
