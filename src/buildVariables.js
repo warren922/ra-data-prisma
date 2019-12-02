@@ -184,36 +184,56 @@ const buildCreateUpdateVariables = (
   resource,
   aorFetchType,
   params,
-  queryType
 ) =>
   Object.keys(params.data).reduce((acc, key) => {
+    if (['id', 'createdAt', 'updatedAt'].includes(key) || key.endsWith('Ids')) {
+      return acc
+    }
+
+
     const value = params.data[key];
+    console.log('value', value);
     if (isArray(value)) {
       // to-many (Type)
       const connect = [];
       const create = [];
-      value.forEach(() => {
-        if (isString(value.id)) {
-          connect.push({id: value.id});
+      value.forEach((v) => {
+        if (v && isString(v.id)) {
+          connect.push({ id: v.id });
         } else {
-          create.push(value);
+          create.push(v);
         }
       });
 
       const param = {};
-      if (connect.length > 0) {
-        param.connect = connect;
-      }
-      if (create.length > 0) {
-        param.create = create;
-      }
-      if (aorFetchType === 'UPDATE') {
-        param.deleteMany = (connect.length > 0 ? {id_not_in: connect.map(c => c.id)} : {})
+      // TODO: handle link to Type and "Update Delete Create" at the same time
+      if (aorFetchType === 'UPDATE' && params.previousData[key].length > 0) {
+        // update if exists have value
+        const previousValue = params.previousData[key];
+        if (create.length > previousValue.length) {
+          param.create = create.slice(previousValue.length);
+        } else if (create.length < previousValue.length) {
+          param.deleteMany = previousValue.slice(create.length);
+        } else {
+          param.updateMany = previousValue.map((pv, i) => ({
+            where: pv,
+            data: create[i],
+          }));
+        }
+
+      } else {
+        // CREATE or no array data before when UPDATE
+        if (connect.length > 0) {
+          param.connect = connect;
+        }
+        if (create.length > 0) {
+          param.create = create;
+        }
       }
 
       return {
         ...acc,
-        [key]: param,
+        [key]: { ...param },
       }
     } else if (isObject(value)) {
       // to-one (Type)
@@ -228,10 +248,6 @@ const buildCreateUpdateVariables = (
           [key]: { create: value }
         };
       }
-    }
-
-    if (['id', 'createdAt', 'updatedAt'].includes(key)) {
-      return acc
     }
 
     // Never return nested types as variables for now
@@ -255,7 +271,7 @@ export default introspectionResults => (
   params,
   queryType
 ) => {
-  console.log('buildVariables introspectionResults', introspectionResults);
+  console.log('buildVariables introspectionResults', resource, aorFetchType, params, queryType);
   const preparedParams = prepareParams(
     params,
     queryType,
