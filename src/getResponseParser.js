@@ -1,7 +1,6 @@
 import { GET_LIST, GET_MANY, GET_MANY_REFERENCE } from 'ra-core';
 
 const sanitizeResource = data => {
-  console.log('sanitizeResource', data);
   const result = Object.keys(data).reduce((acc, key) => {
     if (key.startsWith('_')) {
       return acc;

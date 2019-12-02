@@ -14,8 +14,8 @@ const defaultOptions = {
         return `${pluralize(camelCase(resource.name))}`
       },
       [GET_ONE]: resource => `${camelCase(resource.name)}`,
-      [GET_MANY]: resource => `${pluralize(camelCase(resource.name))}Connection`,
-      [GET_MANY_REFERENCE]: resource => `${pluralize(camelCase(resource.name))}Connection`,
+      [GET_MANY]: resource => `${pluralize(camelCase(resource.name))}`,
+      [GET_MANY_REFERENCE]: resource => `${pluralize(camelCase(resource.name))}`,
       [CREATE]: resource => `create${resource.name}`,
       [UPDATE]: resource => `update${resource.name}`,
       [DELETE]: resource => `delete${resource.name}`

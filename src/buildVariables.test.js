@@ -21,7 +21,7 @@ describe('buildVariables', () => {
             };
             const params = {
                 filter: {
-                    ids: ['foo1', 'foo2'],
+                    id_in: ['foo1', 'foo2'],
                     tags: { id: ['tag1', 'tag2'] },
                     'author.id': 'author1',
                     views: 100,
@@ -39,7 +39,7 @@ describe('buildVariables', () => {
                 )
             ).toEqual({
                 filter: {
-                    ids: ['foo1', 'foo2'],
+                    id_in: ['foo1', 'foo2'],
                     tags_some: { id_in: ['tag1', 'tag2'] },
                     author: { id: 'author1' },
                     views: 100,
@@ -111,7 +111,7 @@ describe('buildVariables', () => {
     describe('GET_MANY', () => {
         it('returns correct variables', () => {
             const params = {
-                ids: ['tag1', 'tag2'],
+                id_in: ['tag1', 'tag2'],
             };
 
             expect(

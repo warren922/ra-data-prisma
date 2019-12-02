@@ -8,7 +8,7 @@ import {
   UPDATE,
   DELETE,
 } from 'ra-core';
-
+import { isObject, isArray, isString } from 'lodash';
 import getFinalType from './getFinalType';
 import isList from './isList';
 
@@ -187,55 +187,65 @@ const buildCreateUpdateVariables = (
   queryType
 ) =>
   Object.keys(params.data).reduce((acc, key) => {
-    if (Array.isArray(params.data[key])) {
-      const arg = queryType.args.find(a => a.name === `${key}Ids`);
+    const value = params.data[key];
+    if (isArray(value)) {
+      // to-many (Type)
+      const connect = [];
+      const create = [];
+      value.forEach(() => {
+        if (isString(value.id)) {
+          connect.push({id: value.id});
+        } else {
+          create.push(value);
+        }
+      });
 
-      if (arg) {
-        return {
-          ...acc,
-          [`${key}Ids`]: params.data[key].map(({ id }) => id),
-        };
+      const param = {};
+      if (connect.length > 0) {
+        param.connect = connect;
       }
-    }
+      if (create.length > 0) {
+        param.create = create;
+      }
+      if (aorFetchType === 'UPDATE') {
+        param.deleteMany = (connect.length > 0 ? {id_not_in: connect.map(c => c.id)} : {})
+      }
 
-    if (typeof params.data[key] === 'object') {
-      const arg = queryType.args.find(a => a.name === `${key}Id`);
-
-      // FIXME: any types are accepted here!
-      //if(!arg) return acc;
-
-      console.log('Querytype args', queryType.args, params.data[key], key, resource)
-      if (params.data[key] && params.data[key].id) {
-        // CASE connect
+      return {
+        ...acc,
+        [key]: param,
+      }
+    } else if (isObject(value)) {
+      // to-one (Type)
+      if (isString(value.id)) {
         return {
           ...acc,
-          [key]: { connect: { id: params.data[key].id } }
+          [key]: { connect: { id: value.id } }
         };
       } else {
         return {
           ...acc,
-          [key]: { create: params.data[key] }
+          [key]: { create: value }
         };
-
       }
     }
 
-    if (key === 'id') {
+    if (['id', 'createdAt', 'updatedAt'].includes(key)) {
       return acc
     }
 
     // Never return nested types as variables for now
     const parts = key.split('.');
     if (parts.length > 1) {
-      params.data[key].map(item => {
-        console.log(key, item)
-      })
+      // params.data[key].map(item => {
+      //   console.log(key, item)
+      // })
       return acc
     }
 
     return {
       ...acc,
-      [key]: params.data[key],
+      [key]: value,
     };
   }, {});
 
@@ -263,7 +273,7 @@ export default introspectionResults => (
     }
     case GET_MANY:
       return {
-        where: { ids: preparedParams.ids },
+        where: { id_in: preparedParams.ids },
       };
     case GET_MANY_REFERENCE: {
       const parts = preparedParams.target.split('.');
