@@ -9,6 +9,7 @@ import {
   DELETE,
 } from 'ra-core';
 import { isObject, isArray, isString } from 'lodash';
+import { isPlural } from 'pluralize';
 import getFinalType from './getFinalType';
 import isList from './isList';
 
@@ -73,7 +74,7 @@ const prepareParams = (params, queryType, introspectionResults) => {
     ) {
       const args = introspectionResults.types.find(
         item =>
-          item.kind === arg.type.kind && item.name === arg.type.name
+          item.kind === arg.type.kind && item.name === arg.type.name,
       ).inputFields;
       result[key] = prepareParams(param, { args }, introspectionResults);
       return;
@@ -98,7 +99,7 @@ const prepareParams = (params, queryType, introspectionResults) => {
 const buildGetListVariables = introspectionResults => (
   resource,
   aorFetchType,
-  params
+  params,
 ) => {
   const filter = Object.keys(params.filter).reduce((acc, key) => {
     if (key === 'ids') {
@@ -107,7 +108,7 @@ const buildGetListVariables = introspectionResults => (
 
     if (typeof params.filter[key] === 'object') {
       const type = introspectionResults.types.find(
-        t => t.name === `${resource.type.name}WhereInput`
+        t => t.name === `${resource.type.name}WhereInput`,
       );
       const filterSome = type.inputFields.find(t => t.name === `${key}_some`);
 
@@ -117,7 +118,7 @@ const buildGetListVariables = introspectionResults => (
             ...filter_acc,
             [`${k}_in`]: params.filter[key][k],
           }),
-          {}
+          {},
         );
         return { ...acc, [`${key}_some`]: filter };
       }
@@ -128,10 +129,10 @@ const buildGetListVariables = introspectionResults => (
     if (parts.length > 1) {
       if (parts[1] === 'id') {
         const type = introspectionResults.types.find(
-          t => t.name === `${resource.type.name}WhereInput`
+          t => t.name === `${resource.type.name}WhereInput`,
         );
         const filterSome = type.inputFields.find(
-          t => t.name === `${parts[0]}_some`
+          t => t.name === `${parts[0]}_some`,
         );
 
         if (filterSome) {
@@ -160,7 +161,7 @@ const buildGetListVariables = introspectionResults => (
           ...acc,
           [key]: Array.isArray(params.filter[key])
             ? params.filter[key].map(value =>
-              sanitizeValue(type, value)
+              sanitizeValue(type, value),
             )
             : sanitizeValue(type, [params.filter[key]]),
         };
@@ -176,7 +177,7 @@ const buildGetListVariables = introspectionResults => (
     skip: parseInt((params.pagination.page - 1) * params.pagination.perPage),
     first: parseInt(params.pagination.perPage),
     orderBy: `${params.sort.field}_${params.sort.order}`,
-    where: filter
+    where: filter,
   };
 };
 
@@ -187,7 +188,7 @@ const buildCreateUpdateVariables = (
 ) =>
   Object.keys(params.data).reduce((acc, key) => {
     if (['id', 'createdAt', 'updatedAt'].includes(key) || key.endsWith('Ids')) {
-      return acc
+      return acc;
     }
 
 
@@ -234,18 +235,18 @@ const buildCreateUpdateVariables = (
       return {
         ...acc,
         [key]: { ...param },
-      }
+      };
     } else if (isObject(value)) {
       // to-one (Type)
       if (isString(value.id)) {
         return {
           ...acc,
-          [key]: { connect: { id: value.id } }
+          [key]: { connect: { id: value.id } },
         };
       } else {
         return {
           ...acc,
-          [key]: { create: value }
+          [key]: { create: value },
         };
       }
     }
@@ -256,7 +257,7 @@ const buildCreateUpdateVariables = (
       // params.data[key].map(item => {
       //   console.log(key, item)
       // })
-      return acc
+      return acc;
     }
 
     return {
@@ -269,13 +270,13 @@ export default introspectionResults => (
   resource,
   aorFetchType,
   params,
-  queryType
+  queryType,
 ) => {
   console.log('buildVariables introspectionResults', resource, aorFetchType, params, queryType);
   const preparedParams = prepareParams(
     params,
     queryType,
-    introspectionResults
+    introspectionResults,
   );
 
   switch (aorFetchType) {
@@ -284,7 +285,7 @@ export default introspectionResults => (
         resource,
         aorFetchType,
         preparedParams,
-        queryType
+        queryType,
       );
     }
     case GET_MANY:
@@ -293,11 +294,12 @@ export default introspectionResults => (
       };
     case GET_MANY_REFERENCE: {
       const parts = preparedParams.target.split('.');
+      const where = isPlural(parts[0]) ? { [`${parts[0]}_some`]: { id: params.id } } : { [parts[0]]: { id: params.id } };
       return {
         skip: parseInt((params.pagination.page - 1) * params.pagination.perPage),
         first: parseInt(params.pagination.perPage),
         orderBy: `${params.sort.field}_${params.sort.order}`,
-        where: { [parts[0]]: { id: params.id } }
+        where,
       };
     }
     case GET_ONE:
@@ -305,7 +307,7 @@ export default introspectionResults => (
       return {
         where: {
           id: preparedParams.id,
-        }
+        },
       };
     case CREATE: {
       return {
@@ -313,8 +315,8 @@ export default introspectionResults => (
           resource,
           aorFetchType,
           preparedParams,
-          queryType
-        )
+          queryType,
+        ),
       };
     }
     case UPDATE: {
@@ -323,7 +325,7 @@ export default introspectionResults => (
           resource,
           aorFetchType,
           preparedParams,
-          queryType
+          queryType,
         ),
         where: {
           id: preparedParams.id,

@@ -161,7 +161,7 @@ export const buildApolloArgs = (query, variables, inputType, resource) => {
 
   let args;
   if (inputType) {
-    // console.log('inputType', inputType);
+    console.log('inputType', inputType);
     if (inputType.name.endsWith('CreateInput')) {
       args = [gqlTypes.variableDefinition(
         gqlTypes.variable(gqlTypes.name('data')),
