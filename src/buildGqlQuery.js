@@ -88,6 +88,7 @@ export const getArgType = arg => {
 };
 
 export const buildArgs = (query, variables, inputType) => {
+  console.log('buildArgs', query, variables, inputType);
   if (query.args.length === 0) {
     return [];
   }
@@ -156,11 +157,11 @@ export const buildApolloArgs = (query, variables, inputType, resource) => {
     k => typeof variables[k] !== 'undefined'
   );
 
-  console.log('Apollo ARgs', query, variables, validVariables)
+  // console.log('Apollo ARgs', query, variables, validVariables)
 
   let args;
   if (inputType) {
-    console.log('inputType', inputType);
+    // console.log('inputType', inputType);
     if (inputType.name.endsWith('CreateInput')) {
       args = [gqlTypes.variableDefinition(
         gqlTypes.variable(gqlTypes.name('data')),
@@ -238,7 +239,7 @@ export default introspectionResults => (
   const args = buildArgs(queryType, variables, inputType);
   const metaArgs = buildArgs(queryType, metaVariables);
   const fields = buildFields(introspectionResults)(resource.type.fields);
-  console.log('variables', apolloArgs, args, metaArgs, fields, resource)
+  // console.log('variables', apolloArgs, args, metaArgs, fields, resource);
   if (
     aorFetchType === GET_LIST ||
     aorFetchType === GET_MANY ||

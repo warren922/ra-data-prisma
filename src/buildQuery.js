@@ -15,8 +15,6 @@ export const buildQueryFactory = (
             r => r.type.name === resourceName
         );
 
-        console.log('introspectionResults', introspectionResults);
-
         if (!resource) {
             throw new Error(
                 `Unknown resource ${resourceName}. Make sure it has been declared on your server side schema. Known resources are ${knownResources.join(
@@ -52,12 +50,6 @@ export const buildQueryFactory = (
             resource,
             queryType
         );
-
-        console.log('buildQuery', {
-            query,
-            variables,
-            parseResponse,
-        });
 
         return {
             query,

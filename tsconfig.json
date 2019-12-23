@@ -1,9 +1,16 @@
 {
-    "extends": "../../tsconfig.json",
-    "compilerOptions": {
-        "outDir": "lib",
-        "rootDir": "src"
-    },
-    "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "**/*.spec.js"],
-    "include": ["src"]
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "commonjs",
+    "outDir": "lib",
+    "rootDir": "src"
+  },
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.spec.js"
+  ],
+  "include": [
+    "src"
+  ]
 }
