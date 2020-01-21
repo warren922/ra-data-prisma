@@ -43,12 +43,17 @@ const sanitizeResource = data => {
 
 export default introspectionResults => aorFetchType => response => {
   const data = response.data;
+  console.log('response.data', data, aorFetchType);
 
   if (
     aorFetchType === GET_LIST ||
     aorFetchType === GET_MANY ||
     aorFetchType === GET_MANY_REFERENCE
   ) {
+    console.log({
+      data: response.data.items.map(sanitizeResource),
+      total: response.data.total.aggregate.count,
+    });
     return {
       data: response.data.items.map(sanitizeResource),
       total: response.data.total.aggregate.count,

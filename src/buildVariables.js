@@ -8,7 +8,7 @@ import {
   UPDATE,
   DELETE,
 } from 'ra-core';
-import { isObject, isArray, isString } from 'lodash';
+import { isObject, isArray, isDate, isString } from 'lodash';
 import { isPlural } from 'pluralize';
 import getFinalType from './getFinalType';
 import isList from './isList';
@@ -101,6 +101,7 @@ const buildGetListVariables = introspectionResults => (
   aorFetchType,
   params,
 ) => {
+  if (!params || !params.filter) return {};
   const filter = Object.keys(params.filter).reduce((acc, key) => {
     if (key === 'ids') {
       return { ...acc, id_in: params.filter[key] };
@@ -193,8 +194,12 @@ const buildCreateUpdateVariables = (
 
 
     const value = params.data[key];
-    console.log('value', value);
-    if (isArray(value)) {
+    if (isDate(value)) {
+      return {
+        ...acc,
+        [key]: value.toISOString(),
+      };
+    } else if (isArray(value)) {
       // to-many (Type)
       const connect = [];
       const create = [];
@@ -272,7 +277,7 @@ export default introspectionResults => (
   params,
   queryType,
 ) => {
-  console.log('buildVariables introspectionResults', resource, aorFetchType, params, queryType);
+  // console.log('buildVariables introspectionResults', resource, aorFetchType, params, queryType);
   const preparedParams = prepareParams(
     params,
     queryType,
@@ -290,7 +295,7 @@ export default introspectionResults => (
     }
     case GET_MANY:
       return {
-        where: { id_in: preparedParams.ids },
+        where: { id_in: preparedParams.ids.length > 0 && isObject(preparedParams.ids[0]) ? preparedParams.ids.map(v => v.id) : preparedParams.ids },
       };
     case GET_MANY_REFERENCE: {
       const parts = preparedParams.target.split('.');

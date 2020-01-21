@@ -88,7 +88,7 @@ export const getArgType = arg => {
 };
 
 export const buildArgs = (query, variables, inputType) => {
-  console.log('buildArgs', query, variables, inputType);
+  // console.log('buildArgs', query, variables, inputType);
   if (query.args.length === 0) {
     return [];
   }
