@@ -29,7 +29,6 @@ export default options => {
   return buildDataProvider(merge({}, defaultOptions, options)).then(
     defaultDataProvider => {
       return (fetchType, resource, params) => {
-        // console.log('dataProvider', fetchType, resource, params);
         // This provider does not support multiple deletions so instead we send multiple DELETE requests
         // This can be optimized using the apollo-link-batch-http link
         if (fetchType === DELETE_MANY) {
