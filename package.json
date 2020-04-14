@@ -1,14 +1,10 @@
 {
-    "name": "ra-data-prisma",
+    "name": "@ygn_projc_admin/ra-data-prisma",
     "version": "1.0.0",
     "description": "A GraphQL simple data provider for react-admin",
     "main": "src/index.js",
     "module": "esm/index.js",
     "sideEffects": false,
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/marmelab/react-admin.git"
-    },
     "bugs": {
         "url": "https://github.com/marmelab/react-admin/issues"
     },

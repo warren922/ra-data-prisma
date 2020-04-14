@@ -8,7 +8,7 @@ import {
   UPDATE,
   DELETE,
 } from 'ra-core';
-import { isObject, isArray, isDate, isString } from 'lodash';
+import { isObject, isArray, isDate, isString, every, isNumber } from 'lodash';
 import { isPlural } from 'pluralize';
 import getFinalType from './getFinalType';
 import isList from './isList';
@@ -182,12 +182,12 @@ const buildGetListVariables = introspectionResults => (
   };
 };
 
-const buildCreateUpdateVariables = (
+const buildCreateVariables = (
   resource,
   aorFetchType,
   params,
-) =>
-  Object.keys(params.data).reduce((acc, key) => {
+) => {
+  const variables = Object.keys(params.data).reduce((acc, key) => {
     if (['id', 'createdAt', 'updatedAt'].includes(key) || key.endsWith('Ids')) {
       return acc;
     }
@@ -200,6 +200,12 @@ const buildCreateUpdateVariables = (
         [key]: value.toISOString(),
       };
     } else if (isArray(value)) {
+      if (every(value, isString) || every(value, isNumber)) {
+        return {
+          ...acc,
+          [key]: { set: value },
+        };
+      }
       // to-many (Type)
       const connect = [];
       const create = [];
@@ -270,6 +276,131 @@ const buildCreateUpdateVariables = (
       [key]: value,
     };
   }, {});
+  console.log('params/var', params, variables);
+  return variables;
+}
+
+/**
+ * Deep diff between two object, using lodash
+ * @param  {Object} object Object compared
+ * @param  {Object} base   Object to compare with
+ * @return {Object}        Return a new object who represent the diff
+ */
+const difference = (object, base) => {
+  function changes(object, base) {
+    return _.transform(object, function (result, value, key) {
+      if (!_.isEqual(value, base[key])) {
+        result[key] = (_.isObject(value) && _.isObject(base[key])) ? changes(value, base[key]) : value;
+      }
+    });
+  }
+
+  return changes(object, base);
+}
+
+const buildUpdateVariables = (
+  resource,
+  aorFetchType,
+  { data, previousData },
+) => {
+  const differences = difference(data, previousData);
+  console.log('params/var diff', data, previousData, differences);
+  const variables = Object.keys(differences).reduce((acc, key) => {
+    if (['id', 'createdAt', 'updatedAt'].includes(key)) {
+      return acc;
+    }
+
+    const value = data[key];
+    if (isDate(value)) {
+      return {
+        ...acc,
+        [key]: value.toISOString(),
+      };
+    } else if (key.endsWith('Ids')) {
+      return {
+        ...acc,
+        [key.substr(0, key.length - 3)]: { connect: value.map((id) => ({ id })) },
+      };
+    } else if (isArray(value)) {
+      if (every(value, isString) || every(value, isNumber)) {
+        return {
+          ...acc,
+          [key]: { set: value },
+        };
+      }
+      // to-many (Type)
+      const connect = [];
+      const create = [];
+      value.forEach((v) => {
+        if (v && isString(v.id)) {
+          connect.push({ id: v.id });
+        } else {
+          create.push(v);
+        }
+      });
+
+      const param = {};
+      // TODO: handle link to Type and "Update Delete Create" at the same time
+      if (aorFetchType === 'UPDATE' && previousData[key].length > 0) {
+        // update if exists have value
+        const previousValue = previousData[key];
+        if (create.length > previousValue.length) {
+          param.create = create.slice(previousValue.length);
+        } else if (create.length < previousValue.length) {
+          param.deleteMany = previousValue.slice(create.length);
+        } else {
+          param.updateMany = previousValue.map((pv, i) => ({
+            where: pv,
+            data: create[i],
+          }));
+        }
+
+      } else {
+        // CREATE or no array data before when UPDATE
+        if (connect.length > 0) {
+          param.connect = connect;
+        }
+        if (create.length > 0) {
+          param.create = create;
+        }
+      }
+
+      return {
+        ...acc,
+        [key]: { ...param },
+      };
+    } else if (isObject(value)) {
+      console.log('isObject', value, every(value, isNumber));
+      // to-one (Type)
+      if (isString(value.id)) {
+        return {
+          ...acc,
+          [key]: { connect: { id: value.id } },
+        };
+      } else {
+        return {
+          ...acc,
+          [key]: { create: value },
+        };
+      }
+    }
+
+    // Never return nested types as variables for now
+    const parts = key.split('.');
+    if (parts.length > 1) {
+      // params.data[key].map(item => {
+      //   console.log(key, item)
+      // })
+      return acc;
+    }
+
+    return {
+      ...acc,
+      [key]: value,
+    };
+  }, {});
+  return variables;
+}
 
 export default introspectionResults => (
   resource,
@@ -316,7 +447,7 @@ export default introspectionResults => (
       };
     case CREATE: {
       return {
-        data: buildCreateUpdateVariables(
+        data: buildCreateVariables(
           resource,
           aorFetchType,
           preparedParams,
@@ -326,7 +457,7 @@ export default introspectionResults => (
     }
     case UPDATE: {
       return {
-        data: buildCreateUpdateVariables(
+        data: buildUpdateVariables(
           resource,
           aorFetchType,
           preparedParams,
