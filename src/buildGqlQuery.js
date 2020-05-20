@@ -245,6 +245,7 @@ export default introspectionResults => (
     aorFetchType === GET_MANY ||
     aorFetchType === GET_MANY_REFERENCE
   ) {
+    console.log('introspectionResults', aorFetchType, args, metaArgs.filter(arg => !['skip', 'first'].includes(arg.name.value)));
     return gqlTypes.document([
       gqlTypes.operationDefinition(
         'query',
@@ -259,7 +260,7 @@ export default introspectionResults => (
           gqlTypes.field(
             gqlTypes.name(`${queryType.name}Connection`),
             gqlTypes.name('total'),
-            metaArgs,
+            metaArgs.filter(arg => !['skip', 'first'].includes(arg.name.value)),
             null,
             gqlTypes.selectionSet([
               gqlTypes.field(
