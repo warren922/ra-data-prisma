@@ -6,16 +6,24 @@ import pluralize from 'pluralize'
 
 import defaultBuildQuery from './buildQuery';
 
+const pluralizeText = text => {
+  const pluralizeName = pluralize(text);
+  if (text === pluralizeName) {
+    return `${text}s`;
+  }
+  return pluralizeName;
+};
+
 const defaultOptions = {
   buildQuery: defaultBuildQuery,
   introspection: {
     operationNames: {
       [GET_LIST]: resource => {
-        return `${pluralize(camelCase(resource.name))}`
+        return pluralizeText(camelCase(resource.name));
       },
       [GET_ONE]: resource => `${camelCase(resource.name)}`,
-      [GET_MANY]: resource => `${pluralize(camelCase(resource.name))}`,
-      [GET_MANY_REFERENCE]: resource => `${pluralize(camelCase(resource.name))}`,
+      [GET_MANY]: resource => `${pluralizeText(camelCase(resource.name))}`,
+      [GET_MANY_REFERENCE]: resource => `${pluralizeText(camelCase(resource.name))}`,
       [CREATE]: resource => `create${resource.name}`,
       [UPDATE]: resource => `update${resource.name}`,
       [DELETE]: resource => `delete${resource.name}`

@@ -41,6 +41,22 @@ const castType = (value, type) => {
   }
 };
 
+export const getInputObjectForType = (
+  introspectionResults,
+  type,
+  queryTypeName,
+) => {
+  const typeName = type.name;
+  let argName;
+  if (queryTypeName === 'create') {
+    argName = `${typeName}CreateInput`;
+  }
+  if (queryTypeName === 'update') {
+    argName = `${typeName}UpdateInput`;
+  }
+  return introspectionResults.types.find(arg => arg.name === argName);
+};
+
 const prepareParams = (params, queryType, introspectionResults) => {
   const result = {};
 
@@ -81,6 +97,22 @@ const prepareParams = (params, queryType, introspectionResults) => {
     }
 
     if (param instanceof Object && !Array.isArray(param)) {
+      if (param.id) {
+        // For federation
+        const type = getFinalType(queryType.type);
+        const queryTypeName = queryType.name.substring(0, 6);
+        if ( queryTypeName === 'create' || queryTypeName === 'update') {
+          const inputType = getInputObjectForType(introspectionResults, type, queryTypeName);
+          const inputTypeFields = inputType.inputFields.map(field => field.name);
+
+          if (!inputTypeFields.includes(key)) {
+            if (inputTypeFields.includes(key + 'Id')) {
+              result[key + 'Id'] = param.id;
+              return;
+            }
+          }
+        } 
+      }      
       result[key] = prepareParams(param, queryType, introspectionResults);
       return;
     }
@@ -192,7 +224,6 @@ const buildCreateVariables = (
       return acc;
     }
 
-
     const value = params.data[key];
     if (isDate(value)) {
       return {
@@ -290,7 +321,23 @@ const difference = (object, base) => {
   function changes(object, base) {
     return _.transform(object, function (result, value, key) {
       if (!_.isEqual(value, base[key])) {
-        result[key] = (_.isObject(value) && _.isObject(base[key])) ? changes(value, base[key]) : value;
+        if (_.isObject(value) && _.isObject(base[key])) {
+          result[key] = changes(value, base[key]);
+        } else {
+          result[key] = value;
+          // Storing the id to know the operation is update or create.
+          if (!result.id && base.id) {
+            result.id = base.id;
+          }
+        }
+      }
+      if (isArray(value) && isArray(base[key])) {
+        if (value.length < base[key].length) {
+          // For object item that doesn't contain the id is the record that will be created and it should be filtered here.
+          const existedValue = value.filter(v => v.id);
+          const diffArray = _.differenceBy(base[key], existedValue, 'id');
+          result[key] = [...result[key], ...diffArray];
+        }
       }
     });
   }
@@ -304,13 +351,14 @@ const buildUpdateVariables = (
   { data, previousData },
 ) => {
   const differences = difference(data, previousData);
-  console.log('params/var diff', data, previousData, differences);
+  // console.log('params/var diff', data, previousData, differences);
   const variables = Object.keys(differences).reduce((acc, key) => {
     if (['id', 'createdAt', 'updatedAt'].includes(key)) {
       return acc;
     }
 
-    const value = data[key];
+    // const value = data[key];
+    const value = differences[key];
     if (isDate(value)) {
       return {
         ...acc,
@@ -331,38 +379,48 @@ const buildUpdateVariables = (
       // to-many (Type)
       const connect = [];
       const create = [];
-      value.forEach((v) => {
+      const update = [];
+      const remove = [];
+      // const diffValue = differences[key];
+      value.forEach((v, index) => {
+        console.log('v', v);
+        // When there is only an id in the value then we see it as id of connect.
         if (v && isString(v.id)) {
-          connect.push({ id: v.id });
+          if (Object.keys(v).length === 1) {
+            connect.push({ id: v.id });
+          } else {
+            const { id, ...other } = v;
+            // If cannot find the record in data[key] then the operation will be delete.
+            if (data[key].find(dataValue => dataValue.id === id)) {
+              update.push({ data: other, where: { id }});
+            } else {
+              remove.push({ id });
+            }
+          }
         } else {
           create.push(v);
         }
       });
+      const diffValue = differences[key];
+      diffValue
 
+      // console.log('connect', connect);
+      // console.log('create', create);
+      // console.log('update', update);
+      // console.log('remove', remove);
       const param = {};
       // TODO: handle link to Type and "Update Delete Create" at the same time
-      if (aorFetchType === 'UPDATE' && previousData[key].length > 0) {
-        // update if exists have value
-        const previousValue = previousData[key];
-        if (create.length > previousValue.length) {
-          param.create = create.slice(previousValue.length);
-        } else if (create.length < previousValue.length) {
-          param.deleteMany = previousValue.slice(create.length);
-        } else {
-          param.updateMany = previousValue.map((pv, i) => ({
-            where: pv,
-            data: create[i],
-          }));
-        }
-
-      } else {
-        // CREATE or no array data before when UPDATE
-        if (connect.length > 0) {
-          param.connect = connect;
-        }
-        if (create.length > 0) {
-          param.create = create;
-        }
+      if (create.length > 0) {
+        param.create = create;
+      }
+      if (create.length > 0) {
+        param.connect = connect;
+      }
+      if (update.length > 0) {
+        param.update = update;
+      }
+      if (remove.length > 0) {
+        param.delete = remove;
       }
 
       return {
@@ -370,7 +428,6 @@ const buildUpdateVariables = (
         [key]: { ...param },
       };
     } else if (isObject(value)) {
-      console.log('isObject', value, every(value, isNumber));
       // to-one (Type)
       if (isString(value.id)) {
         return {
