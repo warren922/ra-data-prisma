@@ -7,18 +7,18 @@ import {
   CREATE,
   UPDATE,
   DELETE,
-} from 'ra-core';
-import { isObject, isArray, isDate, isString, every, isNumber } from 'lodash';
-import { isPlural } from 'pluralize';
-import getFinalType from './getFinalType';
-import isList from './isList';
+} from "ra-core";
+import { isObject, isArray, isDate, isString, every, isNumber } from "lodash";
+import { isPlural } from "pluralize";
+import getFinalType from "./getFinalType";
+import isList from "./isList";
 
 const sanitizeValue = (type, value) => {
-  if (type.name === 'Int') {
+  if (type.name === "Int") {
     return parseInt(value, 10);
   }
 
-  if (type.name === 'Float') {
+  if (type.name === "Float") {
     return parseFloat(value);
   }
 
@@ -27,13 +27,13 @@ const sanitizeValue = (type, value) => {
 
 const castType = (value, type) => {
   switch (`${type.kind}:${type.name}`) {
-    case 'SCALAR:Int':
+    case "SCALAR:Int":
       return Number(value);
 
-    case 'SCALAR:String':
+    case "SCALAR:String":
       return String(value);
 
-    case 'SCALAR:Boolean':
+    case "SCALAR:Boolean":
       return Boolean(value);
 
     default:
@@ -44,17 +44,17 @@ const castType = (value, type) => {
 export const getInputObjectForType = (
   introspectionResults,
   type,
-  queryTypeName,
+  queryTypeName
 ) => {
   const typeName = type.name;
   let argName;
-  if (queryTypeName === 'create') {
+  if (queryTypeName === "create") {
     argName = `${typeName}CreateInput`;
   }
-  if (queryTypeName === 'update') {
+  if (queryTypeName === "update") {
     argName = `${typeName}UpdateInput`;
   }
-  return introspectionResults.types.find(arg => arg.name === argName);
+  return introspectionResults.types.find((arg) => arg.name === argName);
 };
 
 const prepareParams = (params, queryType, introspectionResults) => {
@@ -64,7 +64,7 @@ const prepareParams = (params, queryType, introspectionResults) => {
     return params;
   }
 
-  Object.keys(params).forEach(key => {
+  Object.keys(params).forEach((key) => {
     const param = params[key];
     let arg = null;
 
@@ -74,7 +74,7 @@ const prepareParams = (params, queryType, introspectionResults) => {
     }
 
     if (queryType && Array.isArray(queryType.args)) {
-      arg = queryType.args.find(item => item.name === key);
+      arg = queryType.args.find((item) => item.name === key);
     }
 
     if (param instanceof File) {
@@ -86,11 +86,10 @@ const prepareParams = (params, queryType, introspectionResults) => {
       param instanceof Object &&
       !Array.isArray(param) &&
       arg &&
-      arg.type.kind === 'INPUT_OBJECT'
+      arg.type.kind === "INPUT_OBJECT"
     ) {
       const args = introspectionResults.types.find(
-        item =>
-          item.kind === arg.type.kind && item.name === arg.type.name,
+        (item) => item.kind === arg.type.kind && item.name === arg.type.name
       ).inputFields;
       result[key] = prepareParams(param, { args }, introspectionResults);
       return;
@@ -101,18 +100,24 @@ const prepareParams = (params, queryType, introspectionResults) => {
         // For federation
         const type = getFinalType(queryType.type);
         const queryTypeName = queryType.name.substring(0, 6);
-        if ( queryTypeName === 'create' || queryTypeName === 'update') {
-          const inputType = getInputObjectForType(introspectionResults, type, queryTypeName);
-          const inputTypeFields = inputType.inputFields.map(field => field.name);
+        if (queryTypeName === "create" || queryTypeName === "update") {
+          const inputType = getInputObjectForType(
+            introspectionResults,
+            type,
+            queryTypeName
+          );
+          const inputTypeFields = inputType.inputFields.map(
+            (field) => field.name
+          );
 
           if (!inputTypeFields.includes(key)) {
-            if (inputTypeFields.includes(key + 'Id')) {
-              result[key + 'Id'] = param.id;
+            if (inputTypeFields.includes(key + "Id")) {
+              result[key + "Id"] = param.id;
               return;
             }
           }
-        } 
-      }      
+        }
+      }
       result[key] = prepareParams(param, queryType, introspectionResults);
       return;
     }
@@ -128,22 +133,22 @@ const prepareParams = (params, queryType, introspectionResults) => {
   return result;
 };
 
-const buildGetListVariables = introspectionResults => (
+const buildGetListVariables = (introspectionResults) => (
   resource,
   aorFetchType,
-  params,
+  params
 ) => {
   if (!params || !params.filter) return {};
   const filter = Object.keys(params.filter).reduce((acc, key) => {
-    if (key === 'ids') {
+    if (key === "ids") {
       return { ...acc, id_in: params.filter[key] };
     }
 
-    if (typeof params.filter[key] === 'object') {
+    if (typeof params.filter[key] === "object") {
       const type = introspectionResults.types.find(
-        t => t.name === `${resource.type.name}WhereInput`,
+        (t) => t.name === `${resource.type.name}WhereInput`
       );
-      const filterSome = type.inputFields.find(t => t.name === `${key}_some`);
+      const filterSome = type.inputFields.find((t) => t.name === `${key}_some`);
 
       if (filterSome) {
         const filter = Object.keys(params.filter[key]).reduce(
@@ -151,21 +156,21 @@ const buildGetListVariables = introspectionResults => (
             ...filter_acc,
             [`${k}_in`]: params.filter[key][k],
           }),
-          {},
+          {}
         );
         return { ...acc, [`${key}_some`]: filter };
       }
     }
 
-    const parts = key.split('.');
+    const parts = key.split(".");
 
     if (parts.length > 1) {
-      if (parts[1] === 'id') {
+      if (parts[1] === "id") {
         const type = introspectionResults.types.find(
-          t => t.name === `${resource.type.name}WhereInput`,
+          (t) => t.name === `${resource.type.name}WhereInput`
         );
         const filterSome = type.inputFields.find(
-          t => t.name === `${parts[0]}_some`,
+          (t) => t.name === `${parts[0]}_some`
         );
 
         if (filterSome) {
@@ -178,12 +183,14 @@ const buildGetListVariables = introspectionResults => (
         return { ...acc, [parts[0]]: { id: params.filter[key] } };
       }
 
-      const resourceField = resource.type.fields.find(f => f.name === parts[0]);
+      const resourceField = resource.type.fields.find(
+        (f) => f.name === parts[0]
+      );
       const type = getFinalType(resourceField.type);
       return { ...acc, [key]: sanitizeValue(type, params.filter[key]) };
     }
 
-    const resourceField = resource.type.fields.find(f => f.name === key);
+    const resourceField = resource.type.fields.find((f) => f.name === key);
 
     if (resourceField) {
       const type = getFinalType(resourceField.type);
@@ -193,9 +200,7 @@ const buildGetListVariables = introspectionResults => (
         return {
           ...acc,
           [key]: Array.isArray(params.filter[key])
-            ? params.filter[key].map(value =>
-              sanitizeValue(type, value),
-            )
+            ? params.filter[key].map((value) => sanitizeValue(type, value))
             : sanitizeValue(type, [params.filter[key]]),
         };
       }
@@ -214,13 +219,9 @@ const buildGetListVariables = introspectionResults => (
   };
 };
 
-const buildCreateVariables = (
-  resource,
-  aorFetchType,
-  params,
-) => {
+const buildCreateVariables = (resource, aorFetchType, params) => {
   const variables = Object.keys(params.data).reduce((acc, key) => {
-    if (['id', 'createdAt', 'updatedAt'].includes(key) || key.endsWith('Ids')) {
+    if (["id", "createdAt", "updatedAt"].includes(key) || key.endsWith("Ids")) {
       return acc;
     }
 
@@ -250,7 +251,7 @@ const buildCreateVariables = (
 
       const param = {};
       // TODO: handle link to Type and "Update Delete Create" at the same time
-      if (aorFetchType === 'UPDATE' && params.previousData[key].length > 0) {
+      if (aorFetchType === "UPDATE" && params.previousData[key].length > 0) {
         // update if exists have value
         const previousValue = params.previousData[key];
         if (create.length > previousValue.length) {
@@ -263,7 +264,6 @@ const buildCreateVariables = (
             data: create[i],
           }));
         }
-
       } else {
         // CREATE or no array data before when UPDATE
         if (connect.length > 0) {
@@ -294,7 +294,7 @@ const buildCreateVariables = (
     }
 
     // Never return nested types as variables for now
-    const parts = key.split('.');
+    const parts = key.split(".");
     if (parts.length > 1) {
       // params.data[key].map(item => {
       //   console.log(key, item)
@@ -307,9 +307,9 @@ const buildCreateVariables = (
       [key]: value,
     };
   }, {});
-  console.log('params/var', params, variables);
+  console.log("params/var", params, variables);
   return variables;
-}
+};
 
 /**
  * Deep diff between two object, using lodash
@@ -334,8 +334,9 @@ const difference = (object, base) => {
       if (isArray(value) && isArray(base[key])) {
         if (value.length < base[key].length) {
           // For object item that doesn't contain the id is the record that will be created and it should be filtered here.
-          const existedValue = value.filter(v => v.id);
-          const diffArray = _.differenceBy(base[key], existedValue, 'id');
+          const existedValue = value.filter((v) => v.id);
+          // Get the removed value from base data in order to delete.
+          const diffArray = _.differenceBy(base[key], existedValue, "id");
           result[key] = [...result[key], ...diffArray];
         }
       }
@@ -343,17 +344,24 @@ const difference = (object, base) => {
   }
 
   return changes(object, base);
-}
+};
 
 const buildUpdateVariables = (
   resource,
   aorFetchType,
-  { data, previousData },
+  { data, previousData }
 ) => {
   const differences = difference(data, previousData);
+  // Filter the undefined value in differences
+  for (const key in differences) {
+    if (isArray(differences[key])) {
+      differences[key] = differences[key].filter((value) => value);
+    }
+  }
+  console.log("differences", differences);
   // console.log('params/var diff', data, previousData, differences);
   const variables = Object.keys(differences).reduce((acc, key) => {
-    if (['id', 'createdAt', 'updatedAt'].includes(key)) {
+    if (["id", "createdAt", "updatedAt"].includes(key)) {
       return acc;
     }
 
@@ -364,10 +372,12 @@ const buildUpdateVariables = (
         ...acc,
         [key]: value.toISOString(),
       };
-    } else if (key.endsWith('Ids')) {
+    } else if (key.endsWith("Ids")) {
       return {
         ...acc,
-        [key.substr(0, key.length - 3)]: { connect: value.map((id) => ({ id })) },
+        [key.substr(0, key.length - 3)]: {
+          connect: value.map((id) => ({ id })),
+        },
       };
     } else if (isArray(value)) {
       if (every(value, isString) || every(value, isNumber)) {
@@ -383,16 +393,16 @@ const buildUpdateVariables = (
       const remove = [];
       // const diffValue = differences[key];
       value.forEach((v, index) => {
-        console.log('v', v);
+        console.log("v", v);
         // When there is only an id in the value then we see it as id of connect.
         if (v && isString(v.id)) {
           if (Object.keys(v).length === 1) {
             connect.push({ id: v.id });
           } else {
             const { id, ...other } = v;
-            // If cannot find the record in data[key] then the operation will be delete.
-            if (data[key].find(dataValue => dataValue.id === id)) {
-              update.push({ data: other, where: { id }});
+            // If cannot find the id in current data then the operation will be delete.
+            if (data[key].find((dataValue) => dataValue.id === id)) {
+              update.push({ data: other, where: { id } });
             } else {
               remove.push({ id });
             }
@@ -402,7 +412,7 @@ const buildUpdateVariables = (
         }
       });
       const diffValue = differences[key];
-      diffValue
+      diffValue;
 
       // console.log('connect', connect);
       // console.log('create', create);
@@ -428,11 +438,29 @@ const buildUpdateVariables = (
         [key]: { ...param },
       };
     } else if (isObject(value)) {
+      let connect;
+      let update;
       // to-one (Type)
       if (isString(value.id)) {
+        if (Object.keys(value).length === 1) {
+          connect = { id: value.id };
+        } else {
+          const { id, ...other } = value;
+          // If cannot find the id in current data then the operation will be delete.
+          if (data[key].id === id) {
+            update = { ...other };
+          }
+        }
+        const param = {};
+        if (connect) {
+          param.connect = connect;
+        }
+        if (update) {
+          param.update = update;
+        }
         return {
           ...acc,
-          [key]: { connect: { id: value.id } },
+          [key]: { ...param },
         };
       } else {
         return {
@@ -443,7 +471,7 @@ const buildUpdateVariables = (
     }
 
     // Never return nested types as variables for now
-    const parts = key.split('.');
+    const parts = key.split(".");
     if (parts.length > 1) {
       // params.data[key].map(item => {
       //   console.log(key, item)
@@ -457,20 +485,16 @@ const buildUpdateVariables = (
     };
   }, {});
   return variables;
-}
+};
 
-export default introspectionResults => (
+export default (introspectionResults) => (
   resource,
   aorFetchType,
   params,
-  queryType,
+  queryType
 ) => {
   // console.log('buildVariables introspectionResults', resource, aorFetchType, params, queryType);
-  const preparedParams = prepareParams(
-    params,
-    queryType,
-    introspectionResults,
-  );
+  const preparedParams = prepareParams(params, queryType, introspectionResults);
 
   switch (aorFetchType) {
     case GET_LIST: {
@@ -478,18 +502,27 @@ export default introspectionResults => (
         resource,
         aorFetchType,
         preparedParams,
-        queryType,
+        queryType
       );
     }
     case GET_MANY:
       return {
-        where: { id_in: preparedParams.ids.length > 0 && isObject(preparedParams.ids[0]) ? preparedParams.ids.map(v => v.id) : preparedParams.ids },
+        where: {
+          id_in:
+            preparedParams.ids.length > 0 && isObject(preparedParams.ids[0])
+              ? preparedParams.ids.map((v) => v.id)
+              : preparedParams.ids,
+        },
       };
     case GET_MANY_REFERENCE: {
-      const parts = preparedParams.target.split('.');
-      const where = isPlural(parts[0]) ? { [`${parts[0]}_some`]: { id: params.id } } : { [parts[0]]: { id: params.id } };
+      const parts = preparedParams.target.split(".");
+      const where = isPlural(parts[0])
+        ? { [`${parts[0]}_some`]: { id: params.id } }
+        : { [parts[0]]: { id: params.id } };
       return {
-        skip: parseInt((params.pagination.page - 1) * params.pagination.perPage),
+        skip: parseInt(
+          (params.pagination.page - 1) * params.pagination.perPage
+        ),
         first: parseInt(params.pagination.perPage),
         orderBy: `${params.sort.field}_${params.sort.order}`,
         where,
@@ -508,7 +541,7 @@ export default introspectionResults => (
           resource,
           aorFetchType,
           preparedParams,
-          queryType,
+          queryType
         ),
       };
     }
@@ -518,7 +551,7 @@ export default introspectionResults => (
           resource,
           aorFetchType,
           preparedParams,
-          queryType,
+          queryType
         ),
         where: {
           id: preparedParams.id,
