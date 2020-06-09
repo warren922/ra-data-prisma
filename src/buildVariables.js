@@ -8,7 +8,15 @@ import {
   UPDATE,
   DELETE,
 } from "ra-core";
-import { isObject, isArray, isDate, isString, every, isNumber } from "lodash";
+import {
+  isObject,
+  isArray,
+  isDate,
+  isString,
+  every,
+  isNumber,
+  isEmpty,
+} from "lodash";
 import { isPlural } from "pluralize";
 import getFinalType from "./getFinalType";
 import isList from "./isList";
@@ -330,14 +338,15 @@ const difference = (object, base) => {
             result.id = base.id;
           }
         }
-      }
-      if (isArray(value) && isArray(base[key])) {
-        if (value.length < base[key].length) {
+
+        if (isArray(value) && isArray(base[key])) {
           // For object item that doesn't contain the id is the record that will be created and it should be filtered here.
           const existedValue = value.filter((v) => v.id);
           // Get the removed value from base data in order to delete.
           const diffArray = _.differenceBy(base[key], existedValue, "id");
-          result[key] = [...result[key], ...diffArray];
+          if (diffArray.length > 0) {
+            result[key] = result[key].concat(diffArray);
+          }
         }
       }
     });
@@ -355,10 +364,12 @@ const buildUpdateVariables = (
   // Filter the undefined value in differences
   for (const key in differences) {
     if (isArray(differences[key])) {
-      differences[key] = differences[key].filter((value) => value);
+      differences[key] = differences[key].filter(
+        (value) =>
+          (!isObject(value) && value) || (isObject(value) && !isEmpty(value))
+      );
     }
   }
-  console.log("differences", differences);
   // console.log('params/var diff', data, previousData, differences);
   const variables = Object.keys(differences).reduce((acc, key) => {
     if (["id", "createdAt", "updatedAt"].includes(key)) {
